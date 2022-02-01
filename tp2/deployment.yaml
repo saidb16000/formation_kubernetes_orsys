@@ -1,11 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment-test
+  name: nginx-deployment-testy
   labels:
     test: testy
 spec:
-  replicas: 2
+  replicas: 20
   selector:
     matchLabels:
       test: testy
