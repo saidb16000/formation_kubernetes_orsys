@@ -28,6 +28,7 @@ metadata:
 spec:
   ports:
   - port: 3306
+    targetPort: 3306
   selector:
     app: mysql
   clusterIP: 10.100.2.23
@@ -60,8 +61,6 @@ spec:
         - containerPort: 3306
           name: mysql
         volumeMounts:
-        - name: mysql-pvc
-          mountPath: /var/lib/mysql
         - name: config
           mountPath: /etc/mysql/conf.d
       volumes:
