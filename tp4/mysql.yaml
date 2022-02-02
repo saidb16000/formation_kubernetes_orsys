@@ -1,0 +1,201 @@
+#apiVersion: storage.k8s.io/v1
+#kind: StorageClass
+#metadata:
+#  name: ebs-storage-class
+#provisioner: kubernetes.io/aws-ebs
+#parameters:
+#  type: io1
+#  iopsPerGB: '10'
+#  fsType: xfs
+#---
+#kind: PersistentVolumeClaim
+#apiVersion: v1
+#metadata:
+#  name: ebs-pvc
+#  namespace: default
+#spec:
+#  accessModes:
+#    - ReadWriteOnce
+#  resources:
+#    requests:
+#      storage: 5Gi
+#  storageClassName: ebs-storage-class
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+  clusterIP: 10.100.2.23
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers: 
+      - image: mysql:5.6 # base image, not customized by configmap
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret-mysql
+              key: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-pvc
+          mountPath: /var/lib/mysql
+        - name: config
+          mountPath: /etc/mysql/conf.d
+      volumes:
+      - name: secret-volume
+        secret:
+          secretName: secret-mysql
+      - name: config
+        configMap:
+          name: mysql-config
+      #- name: mysql-pvc
+      #  persistentVolumeClaim:
+      #    claimName: ebs-pvc
+---
+#apiVersion: batch/v1
+#kind: CronJob
+#metadata:
+#  name: mysql-client
+#spec:
+#  selector:
+#    matchLabels:
+#      app: mysql
+#  schedule: "*/1 * * * *"
+#  jobTemplate:
+#    spec:
+#      template:
+#        metadata:
+#        labels:
+#          app: mysql
+#        spec:
+#          containers:
+#          - image: mysql:5.6
+#            name: mysql
+#            env:
+#            - name: MYSQL_ROOT_PASSWORD
+#              value: password
+#            ports:
+#            - containerPort: 3306
+#              name: mysql
+#            imagePullPolicy: IfNotPresent # Never, Always
+#            command:
+#            - /bin/sh
+#            - -c
+#            - mysql -h mysql -c "SELECT 1 + 1;"
+#          restartPolicy: Never
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-mysql
+data:
+  username: root
+  password: dmFsdWUtMKDo
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  labels:
+    app: mysql
+data:
+  my.cnf: |
+    [client]
+    port    = 3306
+    socket  = /var/run/mysqld/mysqld.sock
+
+    [mysqld_safe]
+    socket  = /var/run/mysqld/mysqld.sock
+    nice    = 0
+    syslog
+
+    [mysqld]
+    user      = mysql
+    pid-file  = /var/run/mysqld/mysqld.pid
+    socket    = /var/run/mysqld/mysqld.sock
+    port      = 3306
+    basedir   = /usr
+    datadir   = /var/lib/mysql
+    tmpdir    = /tmp
+
+    lc-messages-dir         = /usr/share/mysql
+    skip-external-locking
+
+    default-storage-engine  = InnoDB
+
+    bind-address            = 0.0.0.0
+
+    max-connect-errors      = 1000000
+    max_allowed_packet      = 64M
+    skip-name-resolve
+    sysdate-is-now          = 1
+    innodb                  = FORCE
+    innodb-strict-mode      = 1
+
+    wait_timeout            = 60
+    interactive_timeout     = 60
+
+    sort_buffer_size        = 4M
+    read_buffer_size        = 2M
+    join_buffer_size        = 8M
+    read_rnd_buffer_size    = 16M
+
+    thread_concurrency      = 8 # Max CPU * 2
+
+    key-buffer-size         = 32M
+    myisam-recover          = FORCE,BACKUP
+    myisam_sort_buffer_size = 64M
+
+    tmp-table-size          = 128M
+    max-heap-table-size     = 128M
+    query-cache-type        = 0
+    query-cache-size        = 0
+    query_cache_limit       = 1M
+    max-connections         = 5000
+    thread-cache-size       = 50
+    thread_stack            = 192K
+    open-files-limit        = 65535
+    table-definition-cache  = 1024
+    table-open-cache        = 2048
+
+    server-id = 1
+
+    # InnoDB
+    innodb-buffer-pool-size         = 2048M
+    innodb_buffer_pool_instances    = 8
+    innodb_additional_mem_pool_size = 20M
+    innodb_log_buffer_size          = 8M
+    innodb-log-files-in-group       = 2
+    innodb-log-file-size            = 256M
+    innodb-file-per-table           = 1
+    innodb-flush-log-at-trx-commit  = 1
+    innodb-flush-method             = O_DIRECT
+
+    general_log_file                = /var/log/mysql/mysql.log
+    log-error                       = /var/log/mysql/mysql-error.log
+    log-queries-not-using-indexes   = 1
+
+    !includedir /etc/mysql/conf.d/
