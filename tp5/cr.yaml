@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pods-reader
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rbac-role-binding-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: toto
+    apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: pods-reader
+  apiGroup: ""
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubectl
+spec:
+  serviceAccountName: toto
+  containers:
+  - name: kubectl
+    image: particule/kubectl
+    command: ["/bin/sh", "-c", "sleep 1000"]
